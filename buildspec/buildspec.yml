@@ -1,0 +1,33 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+      docker: 20
+    commands:
+      - echo Installing dependencies
+      - npm install
+
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REPOSITORY_NAME
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+  build:
+    commands:
+      - echo Building Docker image
+      - docker build -t $REPOSITORY_NAME:$IMAGE_TAG .
+      - docker tag $REPOSITORY_NAME:$IMAGE_TAG $REPOSITORY_NAME:latest
+
+  post_build:
+    commands:
+      - echo Pushing Docker image to ECR
+      - docker push $REPOSITORY_NAME:$IMAGE_TAG
+      - docker push $REPOSITORY_NAME:latest
+      - echo Writing image definitions file
+      - printf '[{"name":"nodejs-app","imageUri":"%s"}]' $REPOSITORY_NAME:$IMAGE_TAG > imagedefinitions.json
+
+artifacts:
+  files: imagedefinitions.json
