@@ -10,7 +10,7 @@ phases:
       nodejs: 20
     commands:
       - echo Installing npm dependencies for Node.js app
-      - cd nodejs-app && npm install && cd ..
+      - npm install && cd ..
   
   pre_build:
     commands:
