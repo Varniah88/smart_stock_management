@@ -2,55 +2,57 @@ version: 0.2
 
 env:
   variables:
-    ECR_REGISTRY: 003380495206.dkr.ecr.ap-southeast-2.amazonaws.com
+    AWS_REGION: "ap-southeast-2"   # Update if needed
+    NODEJS_APP_ECR: "003380495206.dkr.ecr.ap-southeast-2.amazonaws.com/nodejs-app"
+    MQTT_ECR: "003380495206.dkr.ecr.ap-southeast-2.amazonaws.com/mqtt-broker"
+    NODERED_ECR: "003380495206.dkr.ecr.ap-southeast-2.amazonaws.com/nodered"
 
 phases:
   install:
     runtime-versions:
       nodejs: 18
     commands:
-      - echo Installing dependencies
+      - echo Installing npm dependencies
       - npm install
 
   pre_build:
     commands:
       - echo Logging in to Amazon ECR
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $NODEJS_APP_ECR
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $MQTT_ECR
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $NODERED_ECR
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
 
   build:
     commands:
-      - echo Building Node.js image
+      - echo Building Node.js app Docker image
       - docker build -t nodejs-app:$IMAGE_TAG ./nodejs-app
-      - docker tag nodejs-app:$IMAGE_TAG $ECR_REGISTRY/nodejs-app:$IMAGE_TAG
-      - docker tag nodejs-app:$IMAGE_TAG $ECR_REGISTRY/nodejs-app:latest
+      - docker tag nodejs-app:$IMAGE_TAG $NODEJS_APP_ECR:$IMAGE_TAG
+      - docker tag nodejs-app:$IMAGE_TAG $NODEJS_APP_ECR:latest
 
-      - echo Building MQTT image
+      - echo Building MQTT Docker image
       - docker build -t mqtt-broker:$IMAGE_TAG ./mqtt
-      - docker tag mqtt-broker:$IMAGE_TAG $ECR_REGISTRY/mqtt-broker:$IMAGE_TAG
-      - docker tag mqtt-broker:$IMAGE_TAG $ECR_REGISTRY/mqtt-broker:latest
+      - docker tag mqtt-broker:$IMAGE_TAG $MQTT_ECR:$IMAGE_TAG
+      - docker tag mqtt-broker:$IMAGE_TAG $MQTT_ECR:latest
 
-      - echo Building Node-RED image
+      - echo Building Node-RED Docker image
       - docker build -t nodered:$IMAGE_TAG ./nodered
-      - docker tag nodered:$IMAGE_TAG $ECR_REGISTRY/nodered:$IMAGE_TAG
-      - docker tag nodered:$IMAGE_TAG $ECR_REGISTRY/nodered:latest
+      - docker tag nodered:$IMAGE_TAG $NODERED_ECR:$IMAGE_TAG
+      - docker tag nodered:$IMAGE_TAG $NODERED_ECR:latest
 
   post_build:
     commands:
-      - echo Pushing images to ECR
-      - docker push $ECR_REGISTRY/nodejs-app:$IMAGE_TAG
-      - docker push $ECR_REGISTRY/nodejs-app:latest
-      - docker push $ECR_REGISTRY/mqtt-broker:$IMAGE_TAG
-      - docker push $ECR_REGISTRY/mqtt-broker:latest
-      - docker push $ECR_REGISTRY/nodered:$IMAGE_TAG
-      - docker push $ECR_REGISTRY/nodered:latest
+      - echo Pushing Docker images to ECR
+      - docker push $NODEJS_APP_ECR:$IMAGE_TAG
+      - docker push $NODEJS_APP_ECR:latest
+      - docker push $MQTT_ECR:$IMAGE_TAG
+      - docker push $MQTT_ECR:latest
+      - docker push $NODERED_ECR:$IMAGE_TAG
+      - docker push $NODERED_ECR:latest
 
-      - echo Writing image definitions for ECS
-      - printf '[{"name":"nodejs-app","imageUri":"%s"},{"name":"mqtt","imageUri":"%s"},{"name":"nodered","imageUri":"%s"}]' \
-          $ECR_REGISTRY/nodejs-app:$IMAGE_TAG \
-          $ECR_REGISTRY/mqtt-broker:$IMAGE_TAG \
-          $ECR_REGISTRY/nodered:$IMAGE_TAG \
-          > imagedefinitions.json
+      - echo Writing image definitions for ECS Fargate
+      - printf '[{"name":"nodejs-app","imageUri":"%s"},{"name":"mqtt","imageUri":"%s"},{"name":"nodered","imageUri":"%s"}]' $NODEJS_APP_ECR:$IMAGE_TAG $MQTT_ECR:$IMAGE_TAG $NODERED_ECR:$IMAGE_TAG > imagedefinitions.json
 
 artifacts:
-  files: imagedefinitions.json
+  files:
+    - imagedefinitions.json
