@@ -6,7 +6,6 @@ resource "aws_security_group" "alb_sg" {
   description = "ALB security group"
   vpc_id      = var.vpc_id
 
-  # Allow HTTP from anywhere
   ingress {
     from_port   = 80
     to_port     = 80
@@ -14,7 +13,6 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow all outbound to ECS instances
   egress {
     from_port   = 0
     to_port     = 0
@@ -34,24 +32,22 @@ resource "aws_lb" "main" {
 }
 
 # ==============================
-# Target Groups
+# Target Groups (IP target type for Fargate)
 # ==============================
-# Node-RED
 resource "aws_lb_target_group" "nodered_tg" {
   name        = "nodered-tg"
   port        = 1880
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
-  target_type = "instance"
+  target_type = "ip"
 }
 
-# Node.js App
 resource "aws_lb_target_group" "nodejs_app_tg" {
   name        = "nodejs-app-tg"
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
-  target_type = "instance"
+  target_type = "ip"
 }
 
 # ==============================
@@ -73,9 +69,8 @@ resource "aws_lb_listener" "http_listener" {
 }
 
 # ==============================
-# Listener Rules (Path-based Routing)
+# Listener Rules
 # ==============================
-# Node-RED /nodered*
 resource "aws_lb_listener_rule" "nodered_rule" {
   listener_arn = aws_lb_listener.http_listener.arn
   priority     = 10
@@ -92,7 +87,6 @@ resource "aws_lb_listener_rule" "nodered_rule" {
   }
 }
 
-# Node.js /app*
 resource "aws_lb_listener_rule" "nodejs_rule" {
   listener_arn = aws_lb_listener.http_listener.arn
   priority     = 20
@@ -108,5 +102,4 @@ resource "aws_lb_listener_rule" "nodejs_rule" {
     }
   }
 }
-
 

@@ -6,7 +6,7 @@ resource "random_id" "suffix" {
 }
 
 # ==============================
-# S3 Bucket for Pipeline Artifacts
+# S3 Bucket for Pipeline Artifactspipeline_artifacts
 # ==============================
 resource "aws_s3_bucket" "artifacts" {
   bucket = "${var.project_name}-pipeline-artifacts-${random_id.suffix.hex}"
