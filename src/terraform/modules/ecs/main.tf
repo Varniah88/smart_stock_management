@@ -96,7 +96,7 @@ resource "aws_ecs_task_definition" "mqtt" {
 
   container_definitions = jsonencode([{
     name      = "mqtt"
-    image     = var.mqtt_ecr_url
+    image     = "{$var.mqtt_ecr_url}"
     cpu       = 256
     memory    = 512
     essential = true
