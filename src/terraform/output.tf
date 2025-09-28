@@ -1,12 +1,5 @@
 
 # ECR outputs
-output "weight_sensor_ecr_url" {
-  value = module.weight_sensor_ecr.repository_url
-}
-
-output "mqtt_ecr_url" {
-  value = module.mqtt_ecr.repository_url
-}
 
 output "nodejs_app_ecr_url" {
   value = module.nodejs_ecr.repository_url

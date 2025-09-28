@@ -18,17 +18,22 @@ variable "nodered_tg_arn" {
   type = string
 }
 
+
+variable "mqtt_tg_arn" {
+  type = string
+}
+
 variable "nodejs_app_tg_arn" {
   type = string
 }
 
-variable "nodered_ecr_url" {
-  type = string
-}
+# variable "nodered_ecr_url" {
+#   type = string
+# }
 
-variable "mqtt_ecr_url" {
-  type = string
-}
+# variable "mqtt_ecr_url" {
+#   type = string
+# }
 
 variable "nodejs_app_ecr_url" {
   type = string

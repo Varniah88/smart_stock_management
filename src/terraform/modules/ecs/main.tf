@@ -9,7 +9,7 @@ resource "aws_ecs_cluster" "main" {
 # Security Group for ECS Tasks
 # ==============================
 resource "aws_security_group" "ecs_sg" {
-  name   = "ecs-sg"
+  name   = "ecs-sg-one"
   vpc_id = var.vpc_id
 
   egress {
@@ -23,21 +23,21 @@ resource "aws_security_group" "ecs_sg" {
     from_port       = 1880
     to_port         = 1880
     protocol        = "tcp"
-    security_groups = [var.alb_sg_id]
+    security_groups = [var.alb_sg_id] # ALB for Node-RED
   }
 
   ingress {
     from_port       = 3000
     to_port         = 3000
     protocol        = "tcp"
-    security_groups = [var.alb_sg_id]
+    security_groups = [var.alb_sg_id] # ALB for Node.js
   }
 
   ingress {
     from_port   = 1883
     to_port     = 1883
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] # Allow MQTT (via NLB)
   }
 }
 
@@ -63,6 +63,21 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_policy" {
 }
 
 # ==============================
+# EFS for Mosquitto Config
+# ==============================
+# resource "aws_efs_file_system" "mosquitto" {
+#   creation_token = "mosquitto-config"
+# }
+
+# resource "aws_efs_mount_target" "mosquitto" {
+#   for_each = toset(var.subnets)
+
+#   file_system_id  = aws_efs_file_system.mosquitto.id
+#   subnet_id       = each.value
+#   security_groups = [aws_security_group.ecs_sg.id]
+# }
+
+# ==============================
 # ECS Task Definitions (Fargate)
 # ==============================
 resource "aws_ecs_task_definition" "nodered" {
@@ -75,7 +90,7 @@ resource "aws_ecs_task_definition" "nodered" {
 
   container_definitions = jsonencode([{
     name      = "nodered"
-    image     = var.nodered_ecr_url
+    image     = "nodered/node-red:latest"
     cpu       = 256
     memory    = 512
     essential = true
@@ -83,6 +98,14 @@ resource "aws_ecs_task_definition" "nodered" {
       containerPort = 1880
       protocol      = "tcp"
     }]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = "/ecs/nodered-test"
+        "awslogs-region"        = "ap-southeast-2"
+        "awslogs-stream-prefix" = "nodered"
+      }
+    }
   }])
 }
 
@@ -96,7 +119,7 @@ resource "aws_ecs_task_definition" "mqtt" {
 
   container_definitions = jsonencode([{
     name      = "mqtt"
-    image     = "{$var.mqtt_ecr_url}"
+    image     = "eclipse-mosquitto:2.0.22"
     cpu       = 256
     memory    = 512
     essential = true
@@ -104,6 +127,15 @@ resource "aws_ecs_task_definition" "mqtt" {
       containerPort = 1883
       protocol      = "tcp"
     }]
+    
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = "/ecs/mosquitto-test"
+        "awslogs-region"        = "ap-southeast-2"
+        "awslogs-stream-prefix" = "mqtt"
+      }
+    }
   }])
 }
 
@@ -125,6 +157,24 @@ resource "aws_ecs_task_definition" "nodejs_app" {
       containerPort = 3000
       protocol      = "tcp"
     }]
+    environment = [
+      {
+        name  = "MQTT_BROKER"
+        value = "tcp://mqtt-nlb-one-dd1c623670a50dd1.elb.ap-southeast-2.amazonaws.com:1883"
+      },
+      {
+        name  = "MONGO_URI"
+        value = "mongodb://docdb_user:DocdbPass123!@sensor-docdb-cluster.cluster-czueamasy3z1.ap-southeast-2.docdb.amazonaws.com:27017/supermarket?tls=true&tlsCAFile=/usr/src/app/global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false&authMechanism=SCRAM-SHA-1"
+      }
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = "/ecs/nodejs-app-test"
+        "awslogs-region"        = "ap-southeast-2"
+        "awslogs-stream-prefix" = "nodejs-app"
+      }
+    }
   }])
 }
 
@@ -162,6 +212,12 @@ resource "aws_ecs_service" "mqtt" {
     subnets         = var.subnets
     security_groups = [aws_security_group.ecs_sg.id]
     assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = var.mqtt_tg_arn
+    container_name   = "mqtt"
+    container_port   = 1883
   }
 }
 
